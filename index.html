@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>摺紙大冒險 - 闖關互動挑戰</title>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --bg: #F4F7FB;
+      --card-bg: #FFFFFF;
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+      --success: #10B981;
+      --success-hover: #059669;
+      --text: #1E293B;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px 12px; }
+
+    .game-container {
+      width: 100%;
+      max-width: 680px;
+      background: var(--card-bg);
+      border-radius: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header-bar {
+      padding: 16px 20px;
+      background: #FAFAFA;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .header-info { display: flex; justify-content: space-between; align-items: center; }
+    .stage-badge {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: #EEF2FF;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+    .file-btn {
+      font-size: 0.8rem;
+      padding: 6px 12px;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .progress-track {
+      display: flex;
+      gap: 6px;
+      width: 100%;
+    }
+    .progress-dot {
+      flex: 1;
+      height: 8px;
+      border-radius: 4px;
+      background: var(--border);
+      transition: background 0.3s ease;
+    }
+    .progress-dot.active { background: var(--primary); }
+    .progress-dot.completed { background: var(--success); }
+
+    .video-area {
+      position: relative;
+      width: 100%;
+      background: #000;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .loop-tag {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      backdrop-filter: blur(4px);
+      pointer-events: none;
+    }
+
+    .content-area {
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .step-text {
+      text-align: center;
+    }
+    .step-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .step-desc {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .btn {
+      border: none;
+      outline: none;
+      border-radius: 14px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      padding: 14px 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .btn-prev {
+      background: #F1F5F9;
+      color: var(--text-muted);
+      flex: 1;
+    }
+    .btn-prev:hover { background: #E2E8F0; }
+    .btn-done {
+      background: var(--success);
+      color: white;
+      flex: 2;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+    }
+    .btn-done:hover {
+      background: var(--success-hover);
+      transform: translateY(-1px);
+    }
+
+    .finish-screen {
+      display: none;
+      padding: 40px 20px;
+      text-align: center;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .trophy { font-size: 4rem; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+  <div class="game-container">
+    <div class="header-bar">
+      <div class="header-info">
+        <span class="stage-badge" id="stageBadge">關卡 1 / 6</span>
+        <button class="file-btn" onclick="document.getElementById('fileInput').click()">📁 本機選取 6 部影片</button>
+        <input type="file" id="fileInput" multiple accept="video/mp4,video/*" style="display:none;" onchange="handleFileSelect(event)">
+      </div>
+      <div class="progress-track" id="progressTrack"></div>
+    </div>
+
+    <div class="video-area" id="videoWrapper">
+      <span class="loop-tag">🔄 循環播放中</span>
+      <video id="stepVideo" autoplay loop muted playsinline controls>
+        您的瀏覽器不支援 HTML5 影片。
+      </video>
+    </div>
+
+    <div class="content-area" id="interactiveArea">
+      <div class="step-text">
+        <h2 class="step-title" id="stepTitle">步驟 1</h2>
+        <p class="step-desc" id="stepDesc">請跟著上方影片動作，完成後點選「我完成了」進入下一步！</p>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-prev" id="btnPrev" onclick="prevStep()">⬅ 上一步</button>
+        <button class="btn btn-done" id="btnDone" onclick="completeStep()">✨ 我完成了！</button>
+      </div>
+    </div>
+
+    <div class="finish-screen" id="finishScreen">
+      <div class="trophy">🏆</div>
+      <h2>太厲害了！全部完成！</h2>
+      <p style="color: var(--text-muted);">你已經成功完成了全部 6 個摺紙步驟！</p>
+      <button class="btn btn-done" style="margin-top: 16px; width: 200px;" onclick="restartGame()">🔄 再玩一次</button>
+    </div>
+  </div>
+
+  <script>
+    // ⭐️ 6 個步驟資料清單（可自由調整說明文字）
+    const stepsData = [
+      { step: 1, title: "步驟 1：找到1、6並對摺", videoSrc: "step1.mp4" },
+      { step: 2, title: "步驟 2：找到1、2並對摺", videoSrc: "step2.mp4" },
+      { step: 3, title: "步驟 3：找到1、8並對摺", videoSrc: "step3.mp4" },
+      { step: 4, title: "步驟 4：找到3、8/4、7交界處，並剪開", videoSrc: "step4.mp4" },
+      { step: 5, title: "步驟 5：將小書攤開，4往左、8往右", videoSrc: "step5.mp4" },
+      { step: 6, title: "步驟 6：對折再對折，完成組裝！", videoSrc: "step6.mp4" }
+    ];
+
+    let currentStep = 0;
+    const totalSteps = stepsData.length;
+
+    const video = document.getElementById("stepVideo");
+    const stageBadge = document.getElementById("stageBadge");
+    const stepTitle = document.getElementById("stepTitle");
+    const stepDesc = document.getElementById("stepDesc");
+    const btnPrev = document.getElementById("btnPrev");
+    const progressTrack = document.getElementById("progressTrack");
+    const interactiveArea = document.getElementById("interactiveArea");
+    const videoWrapper = document.getElementById("videoWrapper");
+    const finishScreen = document.getElementById("finishScreen");
+
+    function initProgress() {
+      progressTrack.innerHTML = "";
+      for (let i = 0; i < totalSteps; i++) {
+        const dot = document.createElement("div");
+        dot.className = "progress-dot";
+        progressTrack.appendChild(dot);
+      }
+      renderStep();
+    }
+
+    function renderStep() {
+      const data = stepsData[currentStep];
+      stageBadge.textContent = `關卡 ${currentStep + 1} / ${totalSteps}`;
+      stepTitle.textContent = data.title;
+      stepDesc.textContent = data.desc;
+      
+      if (data.videoBlobUrl) {
+        video.src = data.videoBlobUrl;
+      } else {
+        video.src = data.videoSrc;
+      }
+      video.play().catch(() => {});
+
+      const dots = progressTrack.children;
+      for (let i = 0; i < totalSteps; i++) {
+        dots[i].className = "progress-dot";
+        if (i < currentStep) dots[i].classList.add("completed");
+        if (i === currentStep) dots[i].classList.add("active");
+      }
+
+      btnPrev.style.visibility = currentStep === 0 ? "hidden" : "visible";
+    }
+
+    function completeStep() {
+      confetti({
+        particleCount: 70,
+        spread: 60,
+        origin: { y: 0.8 }
+      });
+
+      if (currentStep < totalSteps - 1) {
+        currentStep++;
+        renderStep();
+      } else {
+        triggerVictory();
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 0) {
+        currentStep--;
+        renderStep();
+      }
+    }
+
+    function triggerVictory() {
+      videoWrapper.style.display = "none";
+      interactiveArea.style.display = "none";
+      finishScreen.style.display = "flex";
+
+      var duration = 3 * 1000;
+      var end = Date.now() + duration;
+      (function frame() {
+        confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 } });
+        confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 } });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      }());
+    }
+
+    function restartGame() {
+      currentStep = 0;
+      videoWrapper.style.display = "flex";
+      interactiveArea.style.display = "flex";
+      finishScreen.style.display = "none";
+      renderStep();
+    }
+
+    function handleFileSelect(event) {
+      const files = Array.from(event.target.files);
+      if (files.length === 0) return;
+      
+      files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+      files.slice(0, 6).forEach((file, index) => {
+        if (stepsData[index]) {
+          stepsData[index].videoBlobUrl = URL.createObjectURL(file);
+        }
+      });
+
+      alert(`已成功匯入 ${Math.min(files.length, 6)} 段影片！`);
+      renderStep();
+    }
+
+    initProgress();
+  </script>
+</body>
+</html>
